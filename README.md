@@ -1,4 +1,3 @@
-
 # Client Query Management System (CQMS)
 
 A Streamlit-based application for managing client queries with dedicated dashboards for **Clients**, **Support Users**, and **Admins**.  
@@ -39,8 +38,4 @@ This system ensures transparency, real-time availability tracking, and direct co
 ---
 
 ## 📂 Project Structure
-
-----------Created by sholinganS------------- 
-
-----------                        
-----------
+----------Created by SholinganS-----------
