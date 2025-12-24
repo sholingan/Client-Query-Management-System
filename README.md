@@ -1,41 +1,80 @@
-# Client Query Management System (CQMS)
+Client Query Management System (CQMS)
+=====================================
 
-A Streamlit-based application for managing client queries with dedicated dashboards for **Clients**, **Support Users**, and **Admins**.  
-This system ensures transparency, real-time availability tracking, and direct communication between support and admin.
+Overview
+--------
+CQMS is a Streamlit-based portal for managing client queries with three roles:
+- Client
+- Support
+- Admin
 
----
+All data (users, queries, chat, doubts, availability) is stored in PostgreSQL for persistence.
 
-## 🚀 Features
+Features
+--------
+1. Client Dashboard
+   - View own queries
+   - Submit new queries
+   - Profile card with login/logout times
 
-### Client Dashboard
-- 👤 Client profile card (shows client name & role)
-- 📋 View queries submitted by the client
-- 📝 Submit new queries with email, mobile, heading, and description
+2. Support Dashboard
+   - Profile card
+   - Toggle availability (persistent in Postgres)
+   - View assigned tickets
+   - Submit doubts to Admin (persistent in Postgres)
+   - Chat with Admin (persistent in Postgres)
+   - Ticket management (single/bulk update)
+   - Analytics (top support users, support group usage)
 
-### Support Dashboard
-- 👤 Support profile card (shows support name & role)
-- 🎫 Ticket count with clickable view of assigned tickets
-- 🟢/🔴 Availability toggle (sidebar)
-- ❓ Ask Admin (submit doubts)
-- 💬 Chat with Admin (sidebar)
+3. Admin Dashboard
+   - Metrics: total, open, closed, in progress
+   - View support availability (from Postgres)
+   - View chat messages (from Postgres)
+   - View doubts (from Postgres)
+   - Ticket management (single/bulk update)
+   - Analytics: monthly query volume, status distribution, top support users, group usage
 
-### Admin Dashboard
-- 📊 Metrics: Total, Open, Closed, In Progress
-- 👥 Support availability tables (Available / Not Available)
-- 📄 All tickets view with single/bulk update options
-- 📈 Analytics: monthly query volume, status distribution, top support users, support group usage
-- 📩 Doubts list from support users
-- 💬 Chat messages from support users
+Database Schema
+---------------
+Tables required:
+- users
+- queries
+- support_chat
+- support_doubts
+- support_availability
 
----
+See schema.sql for CREATE TABLE statements.
 
-## 🛠 Tech Stack
-- **Python** (3.9+)
-- **Streamlit** (UI framework)
-- **Pandas** (data handling)
-- **PostgreSQL** (optional DB integration, session-based fallback available)
+Setup
+-----
+1. Install dependencies:
+   pip install streamlit psycopg2-binary pandas python-dotenv
 
----
+2. Configure environment variables (.env):
+   PG_HOST=localhost
+   PG_PORT=5432
+   PG_DB=CQMS
+   PG_USER=postgres
+   PG_PASSWORD=yourpassword
 
-## 📂 Project Structure
-----------Created by SholinganS-----------
+3. Initialize database:
+   Run schema.sql in PostgreSQL.
+
+4. Run the app:
+   streamlit run app.py
+
+Usage
+-----
+- Clients log in, submit queries, and track their own tickets.
+- Support users log in, toggle availability, manage assigned tickets, chat with Admin, and submit doubts.
+- Admins log in, view all tickets, support availability, chat messages, doubts, and analytics.
+
+Notes
+-----
+- Availability, chat, and doubts are persisted in Postgres.
+- Queries are tracked with status and priority.
+- Analytics charts are generated directly in Streamlit.
+
+Author
+------
+Developed by Sholingan.
