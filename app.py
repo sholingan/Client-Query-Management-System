@@ -248,7 +248,38 @@ def login_page():
 
         st.markdown("</div></div>", unsafe_allow_html=True)
 
-# -------------------- Client dashboard --------------------
+# -------------------- Submit Query --------------------
+def submit_query(username, email, mobile, heading, desc, assigned_to=None):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO queries
+           (username, mail_id, mobile_number, query_heading, query_description,
+            status, priority, query_created_time, assigned_to)
+           VALUES (%s,%s,%s,%s,%s,'Open','Medium',%s,%s)""",
+        (username, email, mobile, heading, desc, datetime.now(), assigned_to)
+    )
+    conn.commit()
+    conn.close()
+
+
+# -------------------- Client Dashboard --------------------
+# -------------------- Submit Query --------------------
+def submit_query(username, email, mobile, heading, desc, assigned_to=None):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO queries
+           (username, mail_id, mobile_number, query_heading, query_description,
+            status, priority, query_created_time, assigned_to)
+           VALUES (%s,%s,%s,%s,%s,'Open','Medium',%s,%s)""",
+        (username, email, mobile, heading, desc, datetime.now(), assigned_to)
+    )
+    conn.commit()
+    conn.close()
+
+
+# -------------------- Client Dashboard --------------------
 def client_dashboard():
     st.header("📞 Client Dashboard")
 
@@ -265,6 +296,7 @@ def client_dashboard():
     if "client_logout_time" in st.session_state:
         st.info(f"Last Logout Time: {st.session_state.client_logout_time}")
 
+    # Show client's own queries
     df = get_queries()
     if "username" in df.columns:
         my_queries = df[df["username"] == client_name]
@@ -277,14 +309,29 @@ def client_dashboard():
     st.markdown("---")
     st.subheader("📝 Submit Query")
 
+    # Fetch support users list for assignment
+    conn = get_connection()
+    support_users = pd.read_sql("SELECT username FROM users WHERE role='Support'", conn)["username"].tolist()
+    conn.close()
+
     email = st.text_input("Email", key="client_email")
     mobile = st.text_input("Mobile", key="client_mobile")
     heading = st.text_input("Heading", key="client_heading")
     desc = st.text_area("Description", key="client_desc")
 
+    # 👉 Optional dropdown: include "None" option for general query
+    assigned_to = st.selectbox("Assign To Support", ["None"] + support_users)
+
     if st.button("Submit Query", key="btn_submit_query"):
-        submit_query(client_name, email, mobile, heading, desc)
-        st.success("Query submitted successfully")
+        assigned_value = None if assigned_to == "None" else assigned_to
+        submit_query(client_name, email, mobile, heading, desc, assigned_value)
+        if assigned_value:
+            st.success(f"Query submitted successfully and assigned to {assigned_value}")
+        else:
+            st.success("Query submitted successfully as a general query (not assigned)")
+
+
+
 
 # -------------------- Support dashboard --------------------
 def support_dashboard():
@@ -302,7 +349,6 @@ def support_dashboard():
     with st.sidebar:
         st.markdown("### 👤 Support Availability")
 
-        # Read current status from DB; if not set, default to Available
         avail_df = get_support_availability()
         current_status = "Available"
         if not avail_df.empty and support_name in avail_df["username"].values:
@@ -393,10 +439,17 @@ def support_dashboard():
             status = st.selectbox("Status", ["Open","In Progress","Closed"], index=["Open","In Progress","Closed"].index(row.status))
             priority = st.selectbox("Priority", ["Low","Medium","High"], index=safe_priority_index(row.priority))
             assigned_to = st.selectbox("Assign To", support_users) if support_users else None
+
             if st.button("Update Ticket"):
                 update_ticket(qid, status, row.query_heading, row.query_description, priority, assigned_to)
                 st.success("Ticket updated")
                 st.rerun()
+
+            # 👉 Forward to Admin button
+            if st.button("Forward to Admin"):
+                forward_text = f"Forwarded Client Query (ID {row.query_id})\nHeading: {row.query_heading}\nDescription: {row.query_description}"
+                save_chat_message(support_name, "Admin", forward_text)
+                st.success("Client query forwarded to Admin.")
 
     with tab2:
         selected_ids = st.multiselect("Select Ticket IDs", filtered_df["query_id"].astype(str).tolist())
@@ -424,6 +477,8 @@ def support_dashboard():
         group_usage = group_usage.sort_values("count", ascending=False)
         st.markdown("#### 🧩 Support group usage")
         st.bar_chart(group_usage.set_index("support_group"))
+
+
 
 # -------------------- Admin dashboard --------------------
 def admin_dashboard():
@@ -488,6 +543,11 @@ def admin_dashboard():
     st.markdown("---")
     tab1, tab2 = st.tabs(["✏️ Single Ticket", "📦 Bulk Update"])
 
+    # Load support users list for assignment
+    conn = get_connection()
+    support_users = pd.read_sql("SELECT username FROM users WHERE role='Support'", conn)["username"].tolist()
+    conn.close()
+
     with tab1:
         ticket_ids = df["query_id"].astype(str).tolist()
         if ticket_ids:
@@ -495,10 +555,15 @@ def admin_dashboard():
             row = df[df["query_id"].astype(str) == qid].iloc[0]
             heading = st.text_input("Heading", value=row.query_heading)
             desc = st.text_area("Description", value=row.query_description)
-            status = st.selectbox("Status", ["Open","In Progress","Closed"], index=["Open","In Progress","Closed"].index(row.status))
-            priority = st.selectbox("Priority", ["Low","Medium","High"], index=safe_priority_index(row.priority))
+            status = st.selectbox("Status", ["Open","In Progress","Closed"],
+                                  index=["Open","In Progress","Closed"].index(row.status))
+            priority = st.selectbox("Priority", ["Low","Medium","High"],
+                                    index=safe_priority_index(row.priority))
+            assigned_to = st.selectbox("Assign To", support_users,
+                                       index=support_users.index(row.assigned_to)
+                                       if row.assigned_to in support_users else 0) if support_users else None
             if st.button("Apply Changes"):
-                update_ticket(qid, status, heading, desc, priority)
+                update_ticket(qid, status, heading, desc, priority, assigned_to)
                 st.success("Ticket updated")
                 st.rerun()
 
@@ -507,10 +572,12 @@ def admin_dashboard():
         if selected_ids:
             status_bulk = st.selectbox("Bulk Status", ["Open","In Progress","Closed"])
             priority_bulk = st.selectbox("Bulk Priority", ["Low","Medium","High"])
+            assigned_bulk = st.selectbox("Bulk Assign To", support_users) if support_users else None
             if st.button("Apply Bulk Update"):
                 for qid in selected_ids:
                     row = df[df["query_id"].astype(str) == qid].iloc[0]
-                    update_ticket(qid, status_bulk, row.query_heading, row.query_description, priority_bulk)
+                    update_ticket(qid, status_bulk, row.query_heading,
+                                  row.query_description, priority_bulk, assigned_bulk)
                 st.success(f"Bulk updated {len(selected_ids)} tickets")
                 st.rerun()
 
@@ -540,6 +607,7 @@ def admin_dashboard():
         group_usage = group_usage.sort_values("count", ascending=False)
         st.markdown("#### 🧩 Support group usage")
         st.bar_chart(group_usage.set_index("support_group"))
+
 def main():
     st.set_page_config("CQMS Portal", layout="wide")
 
